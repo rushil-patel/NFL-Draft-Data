@@ -25,6 +25,7 @@ var link = links[0];
 			var parser = new DOMParser();
 			var doc = parser.parseFromString(xhr.responseText, "text/html");
 			var trs = doc.getElementsByTagName("tr");
+
 			for(var tr in trs) {
 
 				//hides the prototype method in "trs" collection
@@ -32,26 +33,51 @@ var link = links[0];
 
 
 					var td = trs[tr].getElementsByTagName("td")[3];
-
 					//"td" will be undefined when "trs[tr]" is a table header. In this case "trs[tr]" will
 					//only contain "th" not "td". Ignoring these "tr" is fine behavior as they dont contain 
 					//desired data.
 					if(td !== undefined) {
 						var name = td.getAttribute("csk");
 						//if there is a link to get then continue
-						if(td.getElementsByTagName("a").length != 0) {
+						if(td.getElementsByTagName("a").length !== 0) {
 							var endPoint = td.getElementsByTagName("a")[0].getAttribute("href");
 							//add players into link dictionary
 							playerLinks[name] = endPoint;
-
+							console.log(name);
+						} else {
+							//players who dont have a link, no data 
+							console.log(name);
 						}
 
-					}
-				}console.log(Object.keys(playerLinks)[Object.keys(playerLinks).length-1]);
 
+					}
+				}//console.log(Object.keys(playerLinks)[Object.keys(playerLinks).length-1]);
 			}
 
+			// for(var player in playerLinks) {
+			// 	if (playerLinks.hasOwnProperty(player)) {
+			// 		collectStats(base + playerLinks[player]);
+			// 	}
+			// }
+			collectStats(base+"/players/S/SmitAl03.htm");
 		}
 	};
 xhr.send();
+
+
+function collectStats(playerPage) {
+	var xhr2 = new XMLHttpRequest();
+	xhr2.open('GET',playerPage,"false");
+	xhr2.responseText = "document";
+	xhr2.onreadystatechange = function() {
+		if (xhr2.readyState == 4 && xhr2.status == 200) {
+			var parser = new DOMParser();
+			var doc = parser.parseFromString(xhr2.responseText, "text/html");
+			var jTable = doc.getElementById('passing');
+			console.log(jTable);
+		}
+	};
+	xhr2.send();
+}
+
 
