@@ -73,8 +73,30 @@ function collectStats(playerPage) {
 		if (xhr2.readyState == 4 && xhr2.status == 200) {
 			var parser = new DOMParser();
 			var doc = parser.parseFromString(xhr2.responseText, "text/html");
-			var jTable = doc.getElementById('passing');
-			console.log(jTable);
+			var table = $(doc.getElementById('passing'))[0];
+			//Get number of rows/columns
+			var rowLength = table.rows.length;
+			var colLength = table.rows[0].cells.length;
+			//Declare string to fill with table data
+			var tableString = "";
+
+			//Get column headers
+			for (var i = 0; i < colLength; i++) {
+			    tableString += table.rows[0].cells[i].innerHTML.split(",").join("") + ",";
+			}
+
+			tableString = tableString.substring(0, tableString.length - 1);
+			tableString += "\r\n";
+			//Get row data
+			for (var j = 1; j < rowLength; j++) {
+			    for (var k = 0; k < colLength; k++) {
+			    	console.log(table.rows[j].cells[k].innerHTML);
+			        tableString += table.rows[j].cells[k].innerHTML.split(",").join("") + ",";
+			    }
+			    tableString += "\r\n";
+			}
+
+			//console.log(tableString);
 		}
 	};
 	xhr2.send();
