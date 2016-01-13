@@ -42,7 +42,7 @@ var link = links[0];
 						if(td.getElementsByTagName("a").length !== 0) {
 							var endPoint = td.getElementsByTagName("a")[0].getAttribute("href");
 							//add players into link dictionary
-							playerLinks[name] = endPoint;
+							playerLinks[endPoint] = endPoint;
 							console.log(name);
 						} else {
 							//players who dont have a link, no data 
@@ -54,16 +54,24 @@ var link = links[0];
 				}//console.log(Object.keys(playerLinks)[Object.keys(playerLinks).length-1]);
 			}
 
-			// for(var player in playerLinks) {
-			// 	if (playerLinks.hasOwnProperty(player)) {
-			// 		collectStats(base + playerLinks[player]);
-			// 	}
-			// }
-			collectStats(base+"/players/J/JohnTr20.htm", "Johnson, Travis");
+			var numPlayers = playerLinks.length;
+			var endpoints = Object.keys(playerLinks);
+
+			//3 second delay between each download
+			(function myLoop (i) {          
+			   setTimeout(function () {   
+      				collectStats(base+endpoints[i], playerLinks[endpoints[i]]);                         
+      				if (--i >=0) myLoop(i);
+   				}, 3000)
+			})(2);
 		}
 	};
 xhr.send();
 
+
+function collect(url, name) {
+	setTimeout(collectStats(url, name), 3000);
+}
 
 function collectStats(playerPage, playerName) {
 	var xhr2 = new XMLHttpRequest();
@@ -74,71 +82,97 @@ function collectStats(playerPage, playerName) {
 			var parser = new DOMParser();
 			var doc = parser.parseFromString(xhr2.responseText, "text/html");
 			var table;
-			if($(doc.getElementById('passing'))[0]) {
-				table = $(doc.getElementById('passing'))[0];
-				console.log(1);
-			}
-			else if($(doc.getElementById('rushing_and_receiving'))[0]) {
-				table = $(doc.getElementById('rushing_and_receiving'))[0];
-								console.log(2);
- 
-			}
-			else if($(doc.getElementById('receiving_and_rushing'))[0]) {
-				table = $(doc.getElementById('receiving_and_rushing'))[0];
-								console.log(3);
 
-			}
-			else if($(doc.getElementById('defense'))[0]) {
-				table = $(doc.getElementById('defense'))[0];
-								console.log(4);
+			var allTables = doc.getElementsByTagName("table");
+			console.log(allTables);
 
-			}
-			else if($(doc.getElementById('returns'))[0]) {
-				table = $(doc.getElementById('returns'))[0];
-								console.log(5);
-			}
+			for (table in allTables){
+				if (allTables.hasOwnProperty(table)){
+					if(allTables[table].id == "passing") {
+						table = allTables[table];
+						console.log(1);
+						break;
+					}
+					else if(allTables[table].id == 'rushing_and_receiving') {
+						table = allTables[table];
+						console.log(2);
+		 				break;
+					}
+					else if(allTables[table].id == 'receiving_and_rushing') {
+						table = allTables[table];
+						console.log(3);
+						break;
 
+					}
+					else if(allTables[table].id == 'defense') {
+						table = allTables[table];
+						console.log(4);
+						break;
+
+					}
+					else if(allTables[table].id == 'returns') {
+						table = allTables[table];
+						console.log(5);
+						break;
+					}
+				}
+			}
+			
 			console.log(table);
 			//Get number of rows/columns
-			var rowLength = table.rows.length;
-			var colLength = table.rows[0].cells.length;
+			var numRows = table.rows.length;
+
+			var numCols = table.rows[0].cells.length;
 			//Declare string to fill with table data
 			var tableString = "";
 
 			//Get column headers
-			for (var i = 0; i < colLength; i++) {
-			    tableString += table.rows[0].cells[i].innerHTML.split(",").join("") + ",";
+			var row = 1;
+			if(table.id == 'passing') {
+				row = 0;
 			}
+			for (var i = 0; i < table.rows[row].cells.length; i++) {
+			    tableString += table.rows[row].cells[i].innerHTML.split(",").join("") + ",";
+
+			}
+			console.log(tableString);
 
 			tableString = tableString.substring(0, tableString.length - 1);
 			tableString += "\r\n";
 
 			//Get row data
-			for (var j = 1; j < rowLength; j++) {
+			exitLoop:
+			for (var j = row + 1; j < numRows; j++) {
 
-			    for (var k = 0; k < colLength; k++) {
+			    for (var k = 0; k < table.rows[j].cells.length; k++) {
 
 			    	//skip career rows and rows following the carrer row
 			    	if(table.rows[j].cells[k].innerHTML == "Career") {
 			    		//if the Career row is being read skip to the end
-			    		k = colLength;
-			    		j = rowLength;
-			    		break;
+			    		break exitLoop;
 			    	}
 			    	//if there at anchors extract the anchor text
 			    	else if(table.rows[j].cells[k].getElementsByTagName('a')[0]) {
 			    		tableString += table.rows[j].cells[k].getElementsByTagName('a')[0].innerHTML.split(",").join("") + ",";
 			    	}
+			    	else if(k===0 && table.rows[j].cells[0].innerHTML === ''){
+			    		var preValue = table.rows[j-1].cells[k].innerHTML;
+			    		table.rows[j].cells[k].innerHTML = preValue;
+			    		tableString += preValue.split(",").join("") + ",";
+			    	}
+			    	else if(table.rows[j].cells[k].textContent !== undefined) {
+			    		tableString += table.rows[j].cells[k].textContent.split(",").join("") + ",";
+			    	}
+
 			    	//simply add text to the csv string 
 			    	else {
-
 			    		tableString += table.rows[j].cells[k].innerHTML.split(",").join("") + ",";
 			    	}
 			    }
 
 			    tableString += "\r\n";
 			}
-
+			console.log(tableString);
 			download(tableString, playerName+".csv", 'text/csv');
 		}
 	};
@@ -190,5 +224,3 @@ function download(strData, strFileName, strMimeType) {
     }, 333);
     return true;
 }
-
-
