@@ -1,4 +1,4 @@
-var base = "http://www.pro-football-reference.com"
+var base = "http://www.pro-football-reference.com";
 var links = [
 	"http://www.pro-football-reference.com/years/2005/draft.htm",
 	"http://www.pro-football-reference.com/years/2004/draft.htm",
@@ -11,13 +11,24 @@ var links = [
 	"http://www.pro-football-reference.com/years/1997/draft.htm",
 	"http://www.pro-football-reference.com/years/1996/draft.htm",
 	"http://www.pro-football-reference.com/years/1995/draft.htm"
-]
+];
 var playerLinks = {};
-
+var tableString = getTableHeader();
 var xhr =  new XMLHttpRequest();
+var linkIdx = links.length-1;
 
-var link = links[0];
-	console.log(link);
+function scrape() {  
+	console.log(linkIdx+"..");
+	if(linkIdx >= 0) {
+		collectPlayers(links[linkIdx--]);
+    }
+    else if (linkIdx-- == -1) {
+    	download(tableString, "PlayerData.csv", 'text/csv');
+		return;
+    }
+}
+
+function collectPlayers(link) {
 	xhr.open('GET',link,"false");
 	xhr.responseText = "document";
 	xhr.onreadystatechange = function() {
@@ -25,14 +36,17 @@ var link = links[0];
 			var parser = new DOMParser();
 			var doc = parser.parseFromString(xhr.responseText, "text/html");
 			var trs = doc.getElementsByTagName("tr");
+			var year = doc.getElementsByTagName("h1")[0].textContent.split(" ")[0];
 
 			for(var tr in trs) {
 
 				//hides the prototype method in "trs" collection
-				if(trs.hasOwnProperty(tr)) {
+				if(trs.hasOwnProperty(tr) && trs[tr].getElementsByTagName("td").length > 0 ){
 
 
 					var td = trs[tr].getElementsByTagName("td")[3];
+					rnd = trs[tr].getElementsByTagName("td")[0].textContent;
+					pck = trs[tr].getElementsByTagName("td")[1].textContent;
 					//"td" will be undefined when "trs[tr]" is a table header. In this case "trs[tr]" will
 					//only contain "th" not "td". Ignoring these "tr" is fine behavior as they dont contain 
 					//desired data.
@@ -42,11 +56,11 @@ var link = links[0];
 						if(td.getElementsByTagName("a").length !== 0) {
 							var endPoint = td.getElementsByTagName("a")[0].getAttribute("href");
 							//add players into link dictionary
-							playerLinks[endPoint] = endPoint;
-							console.log(name);
+							playerLinks[endPoint] = [name, year, rnd, pck];
+							//console.log(name);
 						} else {
 							//players who dont have a link, no data 
-							console.log(name);
+							//console.log(name);
 						}
 
 
@@ -54,26 +68,41 @@ var link = links[0];
 				}//console.log(Object.keys(playerLinks)[Object.keys(playerLinks).length-1]);
 			}
 
-			var numPlayers = playerLinks.length;
+			var numPlayers = Object.keys(playerLinks).length -1;
 			var endpoints = Object.keys(playerLinks);
-
+			console.log(numPlayers);
 			//3 second delay between each download
 			(function myLoop (i) {          
-			   setTimeout(function () {   
-      				collectStats(base+endpoints[i], playerLinks[endpoints[i]]);                         
-      				if (--i >=0) myLoop(i);
-   				}, 3000)
-			})(2);
+			   setTimeout(function () {  
+			   		console.log(i);
+			   		if(i == -1) {
+			   			playerLinks = {};
+			   			console.log("scraping again");
+			   			scrape();
+			   		} else {
+      					collectStats(base+endpoints[i], playerLinks[endpoints[i]][0], playerLinks[endpoints[i]][1], playerLinks[endpoints[i]][2],playerLinks[endpoints[i]][3]);
+      					if (--i >=-1) myLoop(i);
+      				}
+   				}, 1500)
+			})(numPlayers-1);
 		}
 	};
-xhr.send();
-
-
-function collect(url, name) {
-	setTimeout(collectStats(url, name), 3000);
+	xhr.send();
 }
 
-function collectStats(playerPage, playerName) {
+function getTableHeader() {
+	var tableHeader = "Name, UID,";
+
+	tableHeader = "Name,UID,Year,Age,Tm,Pos,No.,G,GS,QBrec,Cmp,Att,Cmp%,Yds,TD,TD%,Int,Int%,Lng,Y/A,AY/A,Y/C,Y/G,Rate,QBR,Sk,Yds,NY/A,ANY/A,Sk%,4QC,GWD,"+
+				  "RUSH_Att,RUSH_Yds,RUSH_TD,RUSH_Lng,RUSH_Y/A,RUSH_Y/G,RUSH_A/G,RCV_Tgt,RCV_Rec,RCV_Yds,RCV_Y/R,RCV_TD,RCV_Lng,RCV_R/G,RCV_Y/G,YScm,RRTD,Fmb,"+
+				  "PUNT_Ret,PUNT_Yds,PUNT_TD,PUNT_Lng,PUNT_Y/R,KICK_Rt,KICK_Yds,KICK_TD,KICK_Lng,KICK_Y/Rt,APYd,"+
+				  "DEF_Int,DEF_Yds,DEF_TD,DEF_Lng,DEF_PD,FUMB_FF,FUMB_Fmb,FUMB_FR,FUMB_Yds,FUMB_TD,Sk,Tkl,Ast,Sfty,AV";
+	return tableHeader+"\r\n";
+
+}
+
+
+function collectStats(playerPage, playerName, year, rnd, pck) {
 	var xhr2 = new XMLHttpRequest();
 	xhr2.open('GET',playerPage,"false");
 	xhr2.responseText = "document";
@@ -84,68 +113,70 @@ function collectStats(playerPage, playerName) {
 			var table;
 
 			var allTables = doc.getElementsByTagName("table");
-			console.log(allTables);
+			var tableType = "";
+			//console.log(allTables);
 
 			for (table in allTables){
 				if (allTables.hasOwnProperty(table)){
-					if(allTables[table].id == "passing") {
+					tableType = allTables[table].id;
+					if(tableType == "passing") {
 						table = allTables[table];
-						console.log(1);
+						//console.log(1);
 						break;
 					}
-					else if(allTables[table].id == 'rushing_and_receiving') {
+					else if(tableType == 'rushing_and_receiving') {
 						table = allTables[table];
-						console.log(2);
+						//console.log(2);
 		 				break;
 					}
-					else if(allTables[table].id == 'receiving_and_rushing') {
+					else if(tableType == 'receiving_and_rushing') {
 						table = allTables[table];
-						console.log(3);
+						//console.log(3);
 						break;
-
 					}
-					else if(allTables[table].id == 'defense') {
+					else if(tableType == 'defense') {
 						table = allTables[table];
-						console.log(4);
+						//console.log(4);
 						break;
-
 					}
-					else if(allTables[table].id == 'returns') {
+					else if(tableType == 'returns') {
 						table = allTables[table];
-						console.log(5);
+						//console.log(5);
 						break;
 					}
 				}
 			}
 			
-			console.log(table);
+			//console.log(table);
 			//Get number of rows/columns
+			console.log(playerName);
 			var numRows = table.rows.length;
 
 			var numCols = table.rows[0].cells.length;
 			//Declare string to fill with table data
-			var tableString = "";
-
 			//Get column headers
-			var row = 1;
+			var row = 2;
 			if(table.id == 'passing') {
-				row = 0;
+				row = 1;
 			}
-			for (var i = 0; i < table.rows[row].cells.length; i++) {
-			    tableString += table.rows[row].cells[i].innerHTML.split(",").join("") + ",";
+			//for (var i = 0; i < table.rows[row].cells.length; i++) {
+			//    tableString += table.rows[row].cells[i].innerHTML.split(",").join("") + ",";
+		    //}
+			//console.log(tableString);
 
-			}
-			console.log(tableString);
-
-			tableString = tableString.substring(0, tableString.length - 1);
-			tableString += "\r\n";
-
+			//tableString = tableString.substring(0, tableString.length - 1);
+			var tableRow = "";
 			//Get row data
 			exitLoop:
-			for (var j = row + 1; j < numRows; j++) {
+			for (var j = row; j < numRows; j++) {
+				//tableString += playerName.replace(",", " ")+","+year+""+rnd+""+pck+""+",";
+				tableRow = playerName.replace(","," ")+","+year+""+rnd+""+pck+","+
+							"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"+
+							"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"+
+							"0,0,0,0,0,0,0,0,0,0,0,\r\n";
 
+				var val, index;
 			    for (var k = 0; k < table.rows[j].cells.length; k++) {
-
 			    	//skip career rows and rows following the carrer row
 			    	if(table.rows[j].cells[k].innerHTML == "Career") {
 			    		//if the Career row is being read skip to the end
@@ -153,32 +184,83 @@ function collectStats(playerPage, playerName) {
 			    	}
 			    	//if there at anchors extract the anchor text
 			    	else if(table.rows[j].cells[k].getElementsByTagName('a')[0]) {
-			    		tableString += table.rows[j].cells[k].getElementsByTagName('a')[0].innerHTML.split(",").join("") + ",";
+			    		index = getIndex(tableType, k);
+			    		val = table.rows[j].cells[k].getElementsByTagName('a')[0].innerHTML.split(",").join("");
+			    		rowVals = tableRow.split(',');
+			    		rowVals[index] = val;
+			    		tableRow = rowVals.join();
 			    	}
 			    	else if(k===0 && table.rows[j].cells[0].innerHTML === ''){
+			    		index = getIndex(tableType, k);
 			    		var preValue = table.rows[j-1].cells[k].innerHTML;
-			    		table.rows[j].cells[k].innerHTML = preValue;
-			    		tableString += preValue.split(",").join("") + ",";
+			    		rowVals = tableRow.split(',');
+			    		rowVals[index] = preValue;
+			    		tableRow = rowVals.join();
+			    		//table.rows[j].cells[k].innerHTML = preValue;
+			    		//tableString += preValue.split(",").join("") + ",";
 			    	}
 			    	else if(table.rows[j].cells[k].textContent !== undefined) {
-			    		tableString += table.rows[j].cells[k].textContent.split(",").join("") + ",";
+			    		index = getIndex(tableType, k);
+			    		val = table.rows[j].cells[k].textContent.split(",").join("");
+			    		//tableString += table.rows[j].cells[k].textContent.split(",").join("") + ",";
+			    		rowVals = tableRow.split(',');
+			    		rowVals[index] = val;
+			    		tableRow = rowVals.join();
 			    	}
 
 			    	//simply add text to the csv string 
 			    	else {
-			    		tableString += table.rows[j].cells[k].innerHTML.split(",").join("") + ",";
+			    		index = getIndex(tableType, k);
+			    		val = table.rows[j].cells[k].innerHTML.split(",").join("");
+			    		//tableString += table.rows[j].cells[k].innerHTML.split(",").join("") + ",";
+			    		rowVals = tableRow.split(',');
+			    		rowVals[index] = val;
+			    		tableRow = tableRow.join();
 			    	}
 			    }
 
-			    tableString += "\r\n";
+			    tableString += tableRow+"\r\n";
 			}
-			console.log(tableString);
-			download(tableString, playerName+".csv", 'text/csv');
+			//replace playername with UID
+			//console.log(tableString);
 		}
 	};
 	xhr2.send();
 }
 
+function getIndex(tableType, keyIdx) {
+	var newKey;
+	switch(tableType) {
+		case "passing":
+			keys = ["Year","Age","Tm","Pos","No.","G","GS","QBrec","Cmp","Att","Cmp%","Yds","TD","TD%","Int","Int%","Lng","Y/A","AY/A","Y/C","Y/G","Rate","QBR","Sk","Yds","NY/A","ANY/A","Sk%","4QC","GWD","AV"];
+			break;
+		case "rushing_and_receiving":
+			keys = ["Year","Age","Tm","Pos","No.","G","GS","RUSH_Att","RUSH_Yds","RUSH_TD","RUSH_Lng","RUSH_Y/A","RUSH_Y/G","RUSH_A/G","RCV_Tgt","RCV_Rec","RCV_Yds","RCV_Y/R","RCV_TD","RCV_Lng","RCV_R/G","RCV_Y/G","YScm","RRTD","Fmb","AV"];
+			break;
+		case "receiving_and_rushing":
+			keys = ["Year","Age","Tm","Pos","No.","G","GS","RCV_Tgt","RCV_Rec","RCV_Yds","RCV_Y/R","RCV_TD","RCV_Lng","RCV_R/G","RCV_Y/G","RUSH_Att","RUSH_Yds","RUSH_TD","RUSH_Lng","RUSH_Y/A","RUSH_Y/G","RUSH_A/G","YScm","RRTD","Fmb","AV"];
+			break;
+		case "defense":
+			keys = ["Year","Age","Tm","Pos","No.","G","GS","DEF_Int","DEF_Yds","DEF_TD","DEF_Lng","DEF_PD","FUMB_FF","FUMB_Fmb","FUMB_FR","FUMB_Yds","FUMB_TD","Sk","Tkl","Ast","Sfty","AV"];
+			break;
+		case "returns":
+			keys = ["Year","Age","Tm","Pos","No.","G","GS","PUNT_Ret","PUNT_Yds","PUNT_TD","PUNT_Lng","PUNT_Y/R","KICK_Rt","KICK_Yds","KICK_TD","KICK_Lng","KICK_Y/Rt","APYd","AV"];
+			break;
+		default:
+			return;
+	}
+	newKey = keys[keyIdx];
+	return getOffIndex(newKey);
+}
+
+function getOffIndex(key) {
+	tableHeaders = ["Name","UID","Year","Age","Tm","Pos","No.","G","GS","QBrec","Cmp","Att","Cmp%","Yds","TD","TD%","Int","Int%","Lng","Y/A","AY/A","Y/C","Y/G","Rate","QBR","Sk","Yds","NY/A","ANY/A","Sk%","4QC","GWD",
+					"RUSH_Att","RUSH_Yds","RUSH_TD","RUSH_Lng","RUSH_Y/A","RUSH_Y/G","RUSH_A/G","RCV_Tgt","RCV_Rec","RCV_Yds","RCV_Y/R","RCV_TD","RCV_Lng","RCV_R/G","RCV_Y/G","YScm","RRTD","Fmb",
+					"PUNT_Ret","PUNT_Yds","PUNT_TD","PUNT_Lng","PUNT_Y/R","KICK_Rt","KICK_Yds","KICK_TD","KICK_Lng","KICK_Y/Rt","APYd",
+					"DEF_Int","DEF_Yds","DEF_TD","DEF_Lng","DEF_PD","FUMB_FF","FUMB_Fmb","FUMB_FR","FUMB_Yds","FUMB_TD","Sk","Tkl","Ast","Sfty","AV"];
+	idx = tableHeaders.indexOf(key);
+	return idx;
+}
 
 function download(strData, strFileName, strMimeType) {
     var D = document,
